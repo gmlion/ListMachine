@@ -44,22 +44,33 @@ let ``program-lookup`` (label: Label) (Prog prog) =
 
 let step env instruction prog =
     match instruction with
-    | Jump label -> (env, (``program-lookup`` label prog))
+    | Jump label -> 
+        printfn "Jump"
+        printfn "%A" env
+        (env, (``program-lookup`` label prog))
     | Seq (BranchIfNil (variable, label), i) ->
+        printfn "BranchIfNil"
+        printfn "%A" env
         match ``var-lookup`` variable (env) with
         | Nil -> (env, (``program-lookup`` label prog))
         | Cell (_,_) -> (env, i)
-    | Seq (FetchField (v1, Head, v2), i) -> 
+    | Seq (FetchField (v1, Head, v2), i) ->
+        printfn "FetchField"
+        printfn "%A" env
         let variable = ``var-lookup`` v1 env
         match variable with
         | Nil -> (env, i)
         | Cell (value, _) -> ((``var-set`` (v2, value) env), i)
-    | Seq (FetchField (v1, Tail, v2), i) -> 
+    | Seq (FetchField (v1, Tail, v2), i) ->
+        printfn "FetchField"
+        printfn "%A" env
         let variable = ``var-lookup`` v1 env
         match variable with
         | Nil -> (env, i)
         | Cell (_, value) -> ((``var-set`` (v2, value) env), i)
     | Seq (Cons (v0, v1, v'), i) ->
+        printfn "Cons"
+        printfn "%A" env
         ((``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env), i)
     | Halt ->
         printfn "%A" env
