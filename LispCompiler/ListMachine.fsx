@@ -23,7 +23,7 @@ type Instruction =
     | Seq of Instruction * Instruction
     | Halt
 
-let (@@) = Seq
+let (@@) i1 i2 = Seq (i1, i2)
 
 type Program =
     | Prog of List<Label * Instruction>
@@ -42,35 +42,43 @@ let ``program-lookup`` (label: Label) (Prog prog) =
     let (_, result) = List.find findLabel prog
     result
 
-let rec step env instruction prog =
+let step env instruction prog =
     match instruction with
-    | Jump label -> step env (``program-lookup`` label prog) prog
+    | Jump label -> (env, (``program-lookup`` label prog))
     | Seq (BranchIfNil (variable, label), i) ->
         match ``var-lookup`` variable (env) with
-        | Nil -> step env (``program-lookup`` label prog) prog
-        | Cell (_,_) -> step env i prog
+        | Nil -> (env, (``program-lookup`` label prog))
+        | Cell (_,_) -> (env, i)
     | Seq (FetchField (v1, Head, v2), i) -> 
         let variable = ``var-lookup`` v1 env
         match variable with
-        | Nil -> step env i prog
-        | Cell (value, _) -> step (``var-set`` (v2, value) env) i prog
+        | Nil -> (env, i)
+        | Cell (value, _) -> ((``var-set`` (v2, value) env), i)
     | Seq (FetchField (v1, Tail, v2), i) -> 
         let variable = ``var-lookup`` v1 env
         match variable with
-        | Nil -> step env i prog
-        | Cell (_, value) -> step (``var-set`` (v2, value) env) i prog
+        | Nil -> (env, i)
+        | Cell (_, value) -> ((``var-set`` (v2, value) env), i)
     | Seq (Cons (v0, v1, v'), i) ->
-        step (``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env) i prog
-    | Halt -> (env, Halt)
+        ((``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env), i)
+    | Halt ->
+        printfn "%A" env
+        failwith "Halted"
     | _ -> failwith "Not implemented"
 
-let ``run-prog`` prog =
+let ``run-prog`` prog : Instruction =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
-    step env (``program-lookup`` (Label.Id 0) prog) prog
-
-let test = (@@) (Cons (Variable.Name "v0", Variable.Name "v0", Variable.Name "v1"), Cons (Variable.Name "v0", Variable.Name "v0", Variable.Name "v1"))
+    let rec eval env instruction prog =
+        let (newEnv, t') = step env instruction prog
+        eval newEnv t' prog
+    eval env (``program-lookup`` (Label.Id 0) prog) prog
 
 let sampleProgram =
-    [(0, ((@@) ((@@) ((@@) (Cons (Variable.Name "v0", Variable.Name "v0", Variable.Name "v1"), Cons (Name "v0", Name "v1", Name "v1"))), Cons (Name "v0", Name "v1", Name "v1")), Jump (Id 1)))]
+    Prog
+        [(Id 0, Cons (Name "v0", Name "v0", Name "v1") @@ Cons (Name "v0", Name "v1", Name "v1") @@ Cons (Name "v0", Name "v1", Name "v1") @@ Jump (Id 1));
+        (Id 1, BranchIfNil (Name "v1", Id 2) @@ FetchField (Name "v1", Tail, Name "v1") @@ BranchIfNil (Name "v0", Id 1) @@ Jump (Id 2));
+        (Id 2, Halt)]
+
+``run-prog`` sampleProgram
 
 
