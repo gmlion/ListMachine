@@ -72,16 +72,14 @@ let step env instruction prog =
         printfn "Cons"
         printfn "%A" env
         ((``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env), i)
-    | Halt ->
-        printfn "%A" env
-        failwith "Halted"
     | _ -> failwith "Not implemented"
 
-let ``run-prog`` prog : Instruction =
+let ``run-prog`` prog : int =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
     let rec eval env instruction prog =
         let (newEnv, t') = step env instruction prog
-        eval newEnv t' prog
+        if t' = Halt then 0
+        else eval newEnv t' prog
     eval env (``program-lookup`` (Label.Id 0) prog) prog
 
 let sampleProgram =
