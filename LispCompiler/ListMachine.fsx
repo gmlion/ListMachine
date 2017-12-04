@@ -42,43 +42,42 @@ let ``program-lookup`` (label: Label) (Prog prog) =
     let (_, result) = List.find findLabel prog
     result
 
+// Debugging structures
+let mutable callStack = List<Instruction>.Empty
+let mutable envStack = List<Environment>.Empty
+
 let step env instruction prog =
+    callStack <- instruction::callStack
     match instruction with
-    | Jump label -> 
-        printfn "Jump"
-        printfn "%A" env
+    | Jump label ->
         (env, (``program-lookup`` label prog))
     | Seq (BranchIfNil (variable, label), i) ->
-        printfn "BranchIfNil"
-        printfn "%A" env
         match ``var-lookup`` variable (env) with
         | Nil -> (env, (``program-lookup`` label prog))
         | Cell (_,_) -> (env, i)
     | Seq (FetchField (v1, Head, v2), i) ->
-        printfn "FetchField"
-        printfn "%A" env
         let variable = ``var-lookup`` v1 env
         match variable with
         | Nil -> (env, i)
         | Cell (value, _) -> ((``var-set`` (v2, value) env), i)
     | Seq (FetchField (v1, Tail, v2), i) ->
-        printfn "FetchField"
-        printfn "%A" env
         let variable = ``var-lookup`` v1 env
         match variable with
         | Nil -> (env, i)
         | Cell (_, value) -> ((``var-set`` (v2, value) env), i)
     | Seq (Cons (v0, v1, v'), i) ->
-        printfn "Cons"
-        printfn "%A" env
         ((``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env), i)
     | _ -> failwith "Not implemented"
 
-let ``run-prog`` prog : int =
+let ``run-prog`` prog =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
     let rec eval env instruction prog =
         let (newEnv, t') = step env instruction prog
-        if t' = Halt then 0
+        envStack <- env::envStack
+        if t' = Halt then
+            printfn "%A" envStack
+            printfn "%A" callStack
+            env
         else eval newEnv t' prog
     eval env (``program-lookup`` (Label.Id 0) prog) prog
 
