@@ -42,12 +42,7 @@ let ``program-lookup`` (label: Label) (Prog prog) =
     let (_, result) = List.find findLabel prog
     result
 
-// Debugging structures
-let mutable callStack = List<Instruction>.Empty
-let mutable envStack = List<Environment>.Empty
-
 let step env instruction prog =
-    callStack <- instruction::callStack
     match instruction with
     | Jump label ->
         (env, (``program-lookup`` label prog))
@@ -69,11 +64,27 @@ let step env instruction prog =
         ((``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env), i)
     | _ -> failwith "Not implemented"
 
+let debugStep callStack env instruction prog =
+    do callStack := instruction::!callStack
+    step env instruction prog
+
 let ``run-prog`` prog =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
     let rec eval env instruction prog =
         let (newEnv, t') = step env instruction prog
-        envStack <- env::envStack
+        if t' = Halt then
+            env
+        else eval newEnv t' prog
+    eval env (``program-lookup`` (Label.Id 0) prog) prog
+
+let ``debug-prog`` prog =
+    let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
+    // Debugging structures
+    let callStack =ref List<Instruction>.Empty
+    let envStack = ref List<Environment>.Empty 
+    let rec eval env instruction prog =
+        let (newEnv, t') = debugStep callStack env instruction prog
+        do envStack := env::!envStack
         if t' = Halt then
             printfn "%A" envStack
             printfn "%A" callStack
@@ -88,5 +99,5 @@ let sampleProgram =
         (Id 2, Halt)]
 
 ``run-prog`` sampleProgram
-
+``debug-prog`` sampleProgram
 
