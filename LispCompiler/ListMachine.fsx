@@ -80,8 +80,9 @@ let ``run-prog`` prog =
 let ``debug-prog`` prog =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
     // Debugging structures
-    let callStack =ref List<Instruction>.Empty
-    let envStack = ref List<Environment>.Empty 
+    let callStack = ref List<Instruction>.Empty
+    let envStack = ref List<Environment>.Empty
+    
     let rec eval env instruction prog =
         let (newEnv, t') = debugStep callStack env instruction prog
         do envStack := env::!envStack
@@ -100,4 +101,51 @@ let sampleProgram =
 
 ``run-prog`` sampleProgram
 ``debug-prog`` sampleProgram
+
+// ---------- types --------------
+
+type ty = Ty_nil | Ty_list of ty | Ty_listcons of ty
+
+let rec check_subType t1 t2 =
+   match t1, t2 with
+   | Ty_nil, Ty_nil -> true
+   | Ty_nil, Ty_list t1 -> true
+   | Ty_nil, Ty_listcons t1 -> false
+   | Ty_list s1, Ty_nil -> false
+   | Ty_list s1, Ty_list t1 -> check_subType s1 t1
+   | Ty_list s1, Ty_listcons t1 -> false
+   | Ty_listcons s1, Ty_nil -> false
+   | Ty_listcons s1, Ty_list t1 -> check_subType s1 t1
+   | Ty_listcons s1, Ty_listcons t1 -> check_subType s1 t1
+
+let rec lub s t =
+   match s, t with
+   | Ty_nil, Ty_nil -> Ty_nil
+   | Ty_nil, Ty_list t1 -> Ty_list t1
+   | Ty_nil, Ty_listcons t1 -> Ty_list t1
+   | Ty_list s1, Ty_nil -> Ty_list s1
+   | Ty_list s1, Ty_list t1 -> Ty_list (lub s1 t1)
+   | Ty_list s1, Ty_listcons t1 -> Ty_list (lub s1 t1)
+   | Ty_listcons s1, Ty_nil -> Ty_list s1
+   | Ty_listcons s1, Ty_list t1 -> Ty_list (lub s1 t1)
+   | Ty_listcons s1, Ty_listcons t1 -> Ty_listcons (lub s1 t1)
+
+// typing env
+type tenv =
+     | TEnv of Map<Variable, ty>
+
+// program typing
+type pi  =
+     | PI of Map<Label,tenv>
+
+let ``check-env-sub`` (TEnv tenv1) (TEnv tenv2) =
+    let check key t =
+        Map.exists (fun key element -> element = t) tenv2
+    Map.forall check tenv1
+
+let ``typecheck-branch`` (PI pi) tenv1 l =
+    let findLabel = Map.tryFind l pi
+    match findLabel with
+    | None -> false
+    | Some tenv2 -> ``check-env-sub`` tenv1 tenv2
 
