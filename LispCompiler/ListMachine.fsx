@@ -99,6 +99,8 @@ let sampleProgram =
         (Id 1, BranchIfNil (Name "v1", Id 2) @@ FetchField (Name "v1", Tail, Name "v1") @@ BranchIfNil (Name "v0", Id 1) @@ Jump (Id 2));
         (Id 2, Halt)]
 
+// ---------- test ---------------
+
 ``run-prog`` sampleProgram
 ``debug-prog`` sampleProgram
 
@@ -173,3 +175,52 @@ let rec ``typecheck-instr`` pi tenv1 i =
                 if ``typecheck-branch`` pi tenv1 l
                 then Some tenv1
                 else None
+    | FetchField (v1, p, v2) ->
+        match tenv1 with
+        | TEnv t1 ->
+            let findVar = Map.tryFind v1 t1
+            match findVar with
+            | Some (Ty_listcons t) -> 
+                match p with
+                | Head -> Some (TEnv (Map.add v2 t t1))
+                | Tail -> Some (TEnv (Map.add v2 (Ty_list t) t1))
+            | _ -> None
+    | Cons (v1, v2, v3) ->
+        match tenv1 with
+        | TEnv te ->
+            let v1_ty = Map.tryFind v1 te
+            let v2_ty = Map.tryFind v2 te
+            match (v1_ty, v2_ty) with
+            | (None, None)
+            | (None, _)
+            | (_, None) -> None
+            | (Some t0, Some t1) ->
+                let t = lub (Ty_list t0) t1
+                match t with
+                | Ty_list t' -> Some (TEnv (Map.add v3 t' te))
+                | _ -> None
+    | Halt -> None
+
+let rec ``typecheck-block`` pi tenv1 i =
+    match i with
+    | Halt -> true
+    | Seq (i1, i2) ->
+        let instrCheck = ``typecheck-instr`` pi tenv1 i1
+        match instrCheck with
+        | Some tenv1 -> ``typecheck-block`` pi tenv1 i2
+        | None -> false
+    | Jump l -> ``typecheck-branch`` pi tenv1 l
+    | _ -> false
+       
+let rec ``typecheck-blocks`` pi prog =
+    match pi, prog with
+    | (PI pi1, Prog prog1) ->
+        match prog1 with
+        | (l, i)::rest ->
+            match Map.tryFind l pi1 with
+            | Some tenv -> ``typecheck-block`` pi tenv i && ``typecheck-blocks`` pi (Prog rest)
+            | None -> false
+        | [] -> true
+
+let ``typecheck-program`` pi prog =
+    ``typecheck-blocks`` pi prog
