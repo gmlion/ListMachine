@@ -28,6 +28,8 @@ let (@@) i1 i2 = Seq (i1, i2)
 type Program =
     | Prog of List<Label * Instruction>
 
+exception FetchException
+
 // end = empty list
 
 let ``var-lookup`` (var: Variable) (Env env) : Value =
@@ -50,22 +52,24 @@ let step env instruction prog =
         match ``var-lookup`` variable (env) with
         | Nil -> (env, (``program-lookup`` label prog))
         | Cell (_,_) -> (env, i)
-    | Seq (FetchField (v1, Head, v2), i) ->
-        let variable = ``var-lookup`` v1 env
-        match variable with
-        | Nil -> (env, i)
-        | Cell (value, _) -> ((``var-set`` (v2, value) env), i)
-    | Seq (FetchField (v1, Tail, v2), i) ->
-        let variable = ``var-lookup`` v1 env
-        match variable with
-        | Nil -> (env, i)
-        | Cell (_, value) -> ((``var-set`` (v2, value) env), i)
+    | Seq (FetchField (v1, position, v2), i) ->
+        match position with
+        | Head -> 
+            let variable = ``var-lookup`` v1 env
+            match variable with
+            | Nil -> raise FetchException
+            | Cell (value, _) -> ((``var-set`` (v2, value) env), i)
+        | Tail ->
+            let variable = ``var-lookup`` v1 env
+            match variable with
+            | Nil -> raise FetchException
+            | Cell (_, value) -> ((``var-set`` (v2, value) env), i)
     | Seq (Cons (v0, v1, v'), i) ->
         ((``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env), i)
     | _ -> failwith "Not implemented"
 
-let debugStep callStack env instruction prog =
-    do callStack := instruction::!callStack
+let debugStep (callStack: System.Collections.Generic.List<Instruction>) env instruction prog =
+    do callStack.Add(instruction)
     step env instruction prog
 
 let ``run-prog`` prog =
@@ -80,12 +84,12 @@ let ``run-prog`` prog =
 let ``debug-prog`` prog =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
     // Debugging structures
-    let callStack = ref List<Instruction>.Empty
-    let envStack = ref List<Environment>.Empty
+    let callStack = new System.Collections.Generic.List<Instruction>()
+    let envStack = new System.Collections.Generic.List<Environment>()
     
     let rec eval env instruction prog =
         let (newEnv, t') = debugStep callStack env instruction prog
-        do envStack := env::!envStack
+        do envStack.Add(env)
         if t' = Halt then
             printfn "%A" envStack
             printfn "%A" callStack
@@ -166,8 +170,8 @@ let rec ``typecheck-instr`` pi tenv1 i =
             match findLabel with
             | None -> None
             | Some (Ty_list t) ->
-                if ``typecheck-branch`` pi (TEnv (Map.add v Ty_nil (Map.remove v t1))) l
-                then Some (TEnv (Map.add v (Ty_listcons t) (Map.remove v t1)))
+                if ``typecheck-branch`` pi (TEnv (Map.add v Ty_nil t1)) l
+                then Some (TEnv (Map.add v (Ty_listcons t) t1))
                 else None
             | Some (Ty_listcons t) ->
                 Some tenv1
@@ -224,3 +228,9 @@ let rec ``typecheck-blocks`` pi prog =
 
 let ``typecheck-program`` pi prog =
     ``typecheck-blocks`` pi prog
+
+// ------------ test ------------
+
+let sampleTyping =
+    PI (Map.empty.
+            Add(Id 0, (TEnv ([ Name "v0", Ty_nil; Name "v1", Ty_nil ] |> Map.ofList))))
