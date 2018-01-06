@@ -148,8 +148,11 @@ type pi  =
 
 let ``check-env-sub`` (TEnv tenv1) (TEnv tenv2) =
     let check key t =
-        Map.exists (fun key element -> check_subType element t) tenv2
-    Map.forall check tenv1
+        let subelement = Map.tryFind key tenv1
+        match subelement with
+        | Some el -> check_subType el t
+        | None -> false
+    Map.forall check tenv2
 
 let ``typecheck-branch`` (PI pi) tenv1 l =
     let findLabel = Map.tryFind l pi
@@ -197,14 +200,12 @@ let rec ``typecheck-instr`` pi tenv1 i =
             let v1_ty = Map.tryFind v1 te
             let v2_ty = Map.tryFind v2 te
             match (v1_ty, v2_ty) with
-            | (None, None)
-            | (None, _)
-            | (_, None) -> None
             | (Some t0, Some t1) ->
                 let t = lub (Ty_list t0) t1
                 match t with
                 | Ty_list t' -> Some (TEnv (Map.add v3 t' te))
                 | _ -> None
+            | _ -> None
     | Halt -> None
 
 let rec ``typecheck-block`` pi tenv1 i =
