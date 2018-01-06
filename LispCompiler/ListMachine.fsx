@@ -68,9 +68,8 @@ let step env instruction prog =
         ((``var-set`` (v', Cell (``var-lookup`` v0 env, ``var-lookup`` v1 env)) env), i)
     | _ -> failwith "Not implemented"
 
-let debugStep (callStack: System.Collections.Generic.List<Instruction>) env instruction prog =
-    do callStack.Add(instruction)
-    step env instruction prog
+let debugStep callStack env instruction prog =
+    (instruction::callStack, (step env instruction prog))
 
 let ``run-prog`` prog =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
@@ -84,18 +83,21 @@ let ``run-prog`` prog =
 let ``debug-prog`` prog =
     let env = Env (Map.add (Variable.Name "v0") Nil Map.empty)
     // Debugging structures
-    let callStack = new System.Collections.Generic.List<Instruction>()
-    let envStack = new System.Collections.Generic.List<Environment>()
+    //let callStack = new System.Collections.Generic.List<Instruction>()
+    //let envStack = new System.Collections.Generic.List<Environment>()
+
+    let callStack = []
+    let envStack = []
     
-    let rec eval env instruction prog =
-        let (newEnv, t') = debugStep callStack env instruction prog
-        do envStack.Add(env)
+    let rec eval (callStack, envStack, env) instruction prog =
+        let (callStack, (newEnv, t')) = debugStep callStack env instruction prog
         if t' = Halt then
             printfn "%A" envStack
             printfn "%A" callStack
-            env
-        else eval newEnv t' prog
-    eval env (``program-lookup`` (Label.Id 0) prog) prog
+            (env::envStack, env)
+        else eval (callStack, env::envStack, newEnv) t' prog
+    let (_, finalEnv) = eval (callStack, envStack, env) (``program-lookup`` (Label.Id 0) prog) prog
+    finalEnv
 
 let sampleProgram =
     Prog
