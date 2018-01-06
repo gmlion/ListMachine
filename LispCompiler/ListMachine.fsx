@@ -234,5 +234,9 @@ let ``typecheck-program`` pi prog =
 // ------------ test ------------
 
 let sampleTyping =
-    PI (Map.empty.
-            Add(Id 0, (TEnv ([ Name "v0", Ty_nil; Name "v1", Ty_nil ] |> Map.ofList))))
+    PI (Map.empty
+            .Add(Id 0, (TEnv ([ Name "v0", Ty_nil ] |> Map.ofList)))
+            .Add(Id 1, (TEnv ([ Name "v0", Ty_nil; Name "v1", Ty_list Ty_nil] |> Map.ofList)))
+            .Add(Id 2, (TEnv ([] |> Map.ofList))))
+
+``typecheck-program`` sampleTyping sampleProgram
