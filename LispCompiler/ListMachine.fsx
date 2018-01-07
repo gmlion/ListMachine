@@ -46,6 +46,8 @@ let ``program-lookup`` (label: Label) (Prog prog) =
 
 let step env instruction prog =
     match instruction with
+    | Seq(Seq(i1, i2), i3) ->
+        (env, Seq(i1, Seq(i2, i3)))
     | Jump label ->
         (env, (``program-lookup`` label prog))
     | Seq (BranchIfNil (variable, label), i) ->
@@ -109,6 +111,10 @@ let sampleProgram =
 
 ``run-prog`` sampleProgram
 ``debug-prog`` sampleProgram
+
+let ii = (Seq(Seq(Halt,Halt),Halt));;
+step (Env Map.empty) ii (Prog []);;
+
 
 // ---------- types --------------
 
